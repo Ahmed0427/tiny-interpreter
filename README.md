@@ -1,4 +1,4 @@
-# Turing-complete programming language
+# Tiny Programming Language Interpreter
 
 ## Project Overview
 
