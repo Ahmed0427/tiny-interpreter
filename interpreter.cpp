@@ -8,8 +8,14 @@
 #include <vector>
 #include <string>
 #include <cctype>
+#include <cmath>
+
+// Uncomment when solving for CF
+// #include <stack>
+// #define Stack stack
+
+// Uncomment when using local files
 #include "stack.cpp" // User-defined implementation of Stack
-#include "BST.cpp"   // User-defined implementation of Binary Search Tree
 
 using namespace std;
 
@@ -97,23 +103,28 @@ bool isOperator(const string &token)
     return token == "+" || token == "-" || token == "*" ||
            token == "/" || token == ">" || token == "<" ||
            token == ">=" || token == "<=" || token == "==" ||
-           token == "!=" || token == "&&" ||
-           token == "||" || token == "%";
+           token == "!=" || token == "%" || token == "**" ||
+           token == "||" || token == "&&" ||
+           token == "^" || token == "|" || token == "&";
 }
 
 int getPrecedence(const string &op)
 {
+    if (op == "**")
+        return 5;
     if (op == "*" || op == "/" || op == "%")
-        return 3;
+        return 4;
     if (op == "+" || op == "-")
-        return 2;
+        return 3;
     if (op == ">" || op == "<")
-        return 1;
+        return 2;
     if (op == ">=" || op == "<=")
-        return 1;
+        return 2;
     if (op == "==" || op == "!=")
-        return 1;
+        return 2;
     if (op == "&&" || op == "||")
+        return 1;
+    if (op == "^" || op == "|" || op == "&")
         return 0;
     return -1;
 }
@@ -214,20 +225,36 @@ int evaluate(string &expression)
             int value = 0;
             if (token == "-")
                 value = num1 - num2;
-            if (token == "+" || token == "||")
+            if (token == "+")
                 value = num1 + num2;
-            if (token == "*" || token == "&&")
+            if (token == "&&")
+                value = num1 && num2;
+            if (token == "||")
+                value = num1 || num2;
+            if (token == "^")
+                value = num1 ^ num2;
+            if (token == "|")
+                value = num1 | num2;
+            if (token == "&")
+                value = num1 & num2;
+            if (token == "**")
+            {
+                if (num1 == 0 && num2 == 0)
+                    throw invalid_argument("Zero to the power of Zero is Undefined");
+                value = pow(num1, num2);
+            }
+            if (token == "*")
                 value = num1 * num2;
             if (token == "/")
             {
                 if (num2 == 0)
-                    throw invalid_argument("Invalid Expression");
+                    throw invalid_argument("Dividing by Zero is Undefined");
                 value = num1 / num2;
             }
             if (token == "%")
             {
                 if (num2 == 0)
-                    throw invalid_argument("Invalid Expression");
+                    throw invalid_argument("Mod by Zero is Undefined");
                 value = num1 % num2;
             }
             if (token == ">")
@@ -262,7 +289,7 @@ int evaluate(string &expression)
     if (result.size() != 1)
         throw invalid_argument("Invalid Expression");
     return result.top();
-}
+};
 
 void executeLine(string &line)
 {
@@ -284,9 +311,120 @@ void executeLine(string &line)
     {
         cout << evaluate(line) << endl;
     }
+};
+
+void executePrint(string content)
+{
+    content = trim(content);
+    if (content == "")
+        throw invalid_argument("Empty Print Statement");
+
+    if (variables.count(content))
+    {
+        cout << variables[content];
+    }
+    else
+    {
+        if (content[0] == '"' && content.back() == '"')
+        {
+            cout << content.substr(1, content.size() - 2);
+        }
+        else
+        {
+            throw invalid_argument("Undefined variable or invalid string: " + content);
+        }
+    }
 }
 
-void executeWhileLoopLine(const vector<string> &lines, int &currentLineIndex)
+void executePrintln(string content)
+{
+    content = trim(content);
+    if (content == "")
+        throw invalid_argument("Empty Print Statement");
+
+    if (variables.count(content))
+    {
+        cout << variables[content] << endl;
+    }
+    else
+    {
+        if (content[0] == '"' && content.back() == '"')
+        {
+            cout << content.substr(1, content.size() - 2) << endl;
+        }
+        else
+        {
+            throw invalid_argument("Undefined variable or invalid string: " + content);
+        }
+    }
+}
+
+void executeRead(string variableName)
+{
+    variableName = trim(variableName);
+    if (variableName == "")
+        throw invalid_argument("Empty Read Statement");
+
+    if (!isAllAlpha(variableName))
+        throw invalid_argument("Variable name must contain only alphabetic characters");
+
+    int value;
+    cin >> value;
+
+    variables[variableName] = value;
+}
+
+void executeInstruction(string line)
+{
+    if (line.substr(0, 7) == "println")
+    {
+        executePrintln(trim(line.substr(8)));
+    }
+    else if (line.substr(0, 5) == "print")
+    {
+        executePrint(trim(line.substr(6)));
+    }
+    else if (line.substr(0, 4) == "read")
+    {
+        executeRead(trim(line.substr(5)));
+    }
+    else
+    {
+        executeLine(line);
+    }
+}
+
+void executeIfStatement(const vector<string> &lines, int &currentLineIndex)
+{
+    string ifLine = lines[currentLineIndex];
+    size_t start = ifLine.find(' ');
+
+    if (start == string::npos)
+        throw invalid_argument("Invalid If Statement Syntax");
+
+    string condition = trim(ifLine.substr(start + 1));
+    if (condition.empty())
+        throw invalid_argument("If statement missing condition");
+
+    vector<string> ifBody;
+    currentLineIndex++;
+    while (currentLineIndex < lines.size() && lines[currentLineIndex][0] == ' ')
+    {
+        ifBody.push_back(trim(lines[currentLineIndex]));
+        currentLineIndex++;
+    }
+    currentLineIndex--;
+
+    if (evaluate(condition) != 0)
+    {
+        for (string &line : ifBody)
+        {
+            executeInstruction(line);
+        }
+    }
+}
+
+void executeWhileLoop(const vector<string> &lines, int &currentLineIndex)
 {
     string whileLine = lines[currentLineIndex];
     size_t start = whileLine.find(' ');
@@ -315,7 +453,7 @@ void executeWhileLoopLine(const vector<string> &lines, int &currentLineIndex)
             throw runtime_error("Infinite loop detected");
         for (string &line : loopBody)
         {
-            executeLine(line);
+            executeInstruction(trim(line));
         }
     }
 }
@@ -325,9 +463,25 @@ void handleInputLines(vector<string> &lines)
     for (int lineNumber = 0; lineNumber < lines.size(); lineNumber++)
     {
         string line = lines[lineNumber];
-        if (line.substr(0, 5) == "while")
+        if (line.substr(0, 7) == "println")
         {
-            executeWhileLoopLine(lines, lineNumber);
+            executePrintln(trim(line.substr(8)));
+        }
+        else if (line.substr(0, 5) == "print")
+        {
+            executePrint(trim(line.substr(6)));
+        }
+        else if (line.substr(0, 4) == "read")
+        {
+            executeRead(trim(line.substr(5)));
+        }
+        else if (line.substr(0, 5) == "while")
+        {
+            executeWhileLoop(lines, lineNumber);
+        }
+        else if (line.substr(0, 2) == "if")
+        {
+            executeIfStatement(lines, lineNumber);
         }
         else
         {
@@ -338,7 +492,33 @@ void handleInputLines(vector<string> &lines)
 
 int main(int argc, char **argv)
 {
-    if (argc == 2)
+    if (argc == 1) {
+        // used for solving problems in Codeforces, Codechef, Atcoder, etc
+        // exampe code for solving this problem in CF using this language
+        // link : https://codeforces.com/contest/2009/problem/A
+        string instructions = "\nread test\nwhile test > 0\n    read a\n    read b\n    b - a\n    test = test - 1";
+
+        istringstream fileStream(instructions);
+        string line;
+        vector<string> lines;
+
+        while (getline(fileStream, line)) {
+            if (line[0] == ' ') {
+                lines.push_back(line);
+                continue;
+            }
+            line = trim(line);
+            if (line == "") {
+                continue;
+            }
+            lines.push_back(line);
+
+        }
+
+        handleInputLines(lines);
+        return 0;
+    } 
+    else if (argc == 2)
     {
 
         ifstream file(argv[1]);
